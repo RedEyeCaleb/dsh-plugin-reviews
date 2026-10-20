@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { getDb } from '@/server/platform/db';
 import { createSearchService, type SearchSource, type ReviewSearchRow } from '@/server/modules/search';
 import { createCatalogService, UNCATEGORIZED_CATEGORY } from '@/server/modules/catalog';
-import { formatVersionLabel } from '@/packages/common/status-text';
 import type { VersionValue } from '@/packages/common/field-rules';
 import { formatDateTimeOr } from '@/packages/common/time';
 
@@ -71,6 +70,16 @@ function parseVersion(raw: string): VersionValue {
   } catch {
     return { kind: 'unknown' };
   }
+}
+
+/**
+ * 列表只用版本号本身：库里有些值是 "0.9.3 (commit 81b47af…, tag v0.9.3)" 这种长文本，
+ * 在手机一行里会把「插件名」挤没、甚至撑破卡片。详情页仍显示完整值。
+ */
+function compactVersionLabel(version: VersionValue): string {
+  if (version.kind !== 'known') return '插件 未知';
+  const short = version.value.split(/\s*\(/)[0].trim();
+  return `插件 ${short || version.value}`;
 }
 
 export default async function ReviewsPage({
@@ -190,6 +199,7 @@ export default async function ReviewsPage({
                 <ul className="item-list">
                   {items.map((r) => {
                     const label = pluginLabel(r);
+                    const version = parseVersion(r.plugin_version);
                     return (
                       <li key={r.review_id} className="item">
                         <div className="item-body">
@@ -209,8 +219,10 @@ export default async function ReviewsPage({
                                     {label}
                                   </Link>
                                 )}
-                                {/* §22：每条显示"被测版本" */}
-                                <span>{formatVersionLabel('插件', parseVersion(r.plugin_version))}</span>
+                                {/* §22：每条显示"被测版本"（列表里只显示版本号，完整 commit/tag 放 title） */}
+                                <span title={version.kind === 'known' ? `插件 ${version.value}` : '插件 未知'}>
+                                  {compactVersionLabel(version)}
+                                </span>
                                 <span className="review-author">{r.author_nickname}</span>
                                 <span className="review-date">{formatDateTimeOr(r.public_updated_at, '时间未知')}</span>
                               </div>

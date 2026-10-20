@@ -2879,12 +2879,14 @@ input[type='search']:focus {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
     overflow: hidden;
+    overflow-wrap: anywhere;
   }
   .catalog-layout .item-main .list-meta {
     display: flex;
     flex-wrap: nowrap;
     justify-content: space-between;
     align-items: baseline;
+    min-width: 0;
     margin-top: 4px;
     gap: 12px;
   }
@@ -2892,8 +2894,15 @@ input[type='search']:focus {
     flex: 1 1 auto;
     min-width: 0;
   }
+  /* 版本这类长文本必须可截断：否则一个 "0.9.3 (commit 81b47af…)" 就会把
+     插件名挤没、并把整页撑出横向滚动（真机截图复现）。 */
   .catalog-layout .item-main .list-meta > *:not(:first-child) {
+    flex: 0 1 auto;
+    max-width: 55%;
     margin-left: auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     text-align: right;
   }
   /* 表格：横向滚动 + **不换行**。实测窄屏里逐格换行会把表格挤成"文字麻花"，
