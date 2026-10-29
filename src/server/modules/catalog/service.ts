@@ -1142,3 +1142,63 @@ export function createCatalogService(deps: CatalogServiceDeps = {}): CatalogServ
     },
   };
 }
+
+
+/**
+ * 连续不可访问的阈值（规划 §5.3：连续三轮打不开才算「暂不可访问」）。
+ *
+ * 为什么是三次：单次失败太容易来自网络抖动/对方 502/限流；而十次才会让一个真下线的插件
+ * 在站上挂很久。三轮是"既不被抖动骗，也不拖着坏数据"的折中，且与每日探测的节奏吻合。
+ */
+export const UNAVAILABLE_ROUNDS_THRESHOLD = 3;
+
+/**
+ * 结算一次可达性探测的结果（数据保留 §5.3 的轮次逻辑）。
+ *
+ * 语义：
+ *   - reachable=true  → 连续失败计数归零，状态置 available，记录最近成功时间；
+ *   - reachable=false → 计数 +1；**累计到阈值**才把状态置 unavailable，
+ *     未到阈值保持原状态（一次失败不足以改变结论，页面上仍显示"最近一次检查失败"）。
+ *
+ * 只动这三列，不写 operation_records：探测是高频系统行为，审计表留给人工变更
+ * （收录、隐藏、用户管理）。要追历史看 last_checked_at 时间线即可。
+ */
+export function recordAvailabilityRound(
+  db: SqliteDatabase,
+  repositoryId: string,
+  input: { reachable: boolean; now: number },
+): { state: 'available' | 'unavailable' | 'unknown'; consecutiveUnavailable: number } {
+  return withTransaction((tx) => {
+    const row = tx.db
+      .prepare(
+        'SELECT consecutive_unavailable, availability_state FROM repositories WHERE id = ?',
+      )
+      .get(repositoryId) as
+      | { consecutive_unavailable: number; availability_state: 'unknown' | 'available' | 'unavailable' }
+      | undefined;
+    if (!row) throw err.unavailable('仓库不存在。');
+
+    if (input.reachable) {
+      tx.db
+        .prepare(
+          `UPDATE repositories
+              SET availability_state = 'available', consecutive_unavailable = 0,
+                  last_checked_at = ?, last_successful_check_at = ?, updated_at = ?
+            WHERE id = ?`,
+        )
+        .run(input.now, input.now, input.now, repositoryId);
+      return { state: 'available' as const, consecutiveUnavailable: 0 };
+    }
+
+    const next = Number(row.consecutive_unavailable) + 1;
+    const state = next >= UNAVAILABLE_ROUNDS_THRESHOLD ? ('unavailable' as const) : row.availability_state;
+    tx.db
+      .prepare(
+        `UPDATE repositories
+            SET availability_state = ?, consecutive_unavailable = ?, last_checked_at = ?, updated_at = ?
+          WHERE id = ?`,
+      )
+      .run(state, next, input.now, input.now, repositoryId);
+    return { state, consecutiveUnavailable: next };
+  }, db);
+}

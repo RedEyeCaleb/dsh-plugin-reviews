@@ -63,8 +63,13 @@ export async function PUT(
     const ctx = await currentContext();
     const bytes = await readBodyWithinLimit(request, MEDIA_LIMITS.maxBytes);
 
+    // 用途与草稿由前端带上（封面图需要落到 draft_attachment_links）：缺省按正文图处理。
+    const url = new URL(request.url);
+    const usage = url.searchParams.get('usage') === 'cover' ? 'cover' : 'body';
+    const draftId = url.searchParams.get('draftId') ?? undefined;
+
     const media = createMediaService({ db: getDb() });
-    const ready = await media.receiveFile(ctx, { attachmentId, bytes });
+    const ready = await media.receiveFile(ctx, { attachmentId, bytes, usage, draftId });
     return okJson(ready, requestId);
   } catch (e) {
     return errorResponse(e, requestId);

@@ -21,6 +21,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, ErrorNotice, apiFetch } from './api-client';
 import { AccountMenu } from './account-menu';
+import { ThemeSwitch } from './theme-switch';
 import { SignInMenu } from './sign-in-menu';
 import { SiteDrawer } from './site-drawer';
 
@@ -97,6 +98,7 @@ export function SessionNav() {
   };
 
   const inPlugins = pathname === '/plugins' || pathname.startsWith('/plugins/');
+  const inPacks = pathname === '/packs' || pathname.startsWith('/packs/');
   const inReviews = pathname === '/reviews' || pathname.startsWith('/reviews/');
   const inSpec = pathname === '/spec' || pathname.startsWith('/spec/');
 
@@ -114,12 +116,16 @@ export function SessionNav() {
           <Link href="/reviews" className={inReviews ? 'active' : ''} aria-current={inReviews ? 'page' : undefined}>
             评测
           </Link>
+          <Link href="/packs" className={inPacks ? 'active' : ''} aria-current={inPacks ? 'page' : undefined}>
+            整合包
+          </Link>
           <Link href="/spec" className={inSpec ? 'active' : ''} aria-current={inSpec ? 'page' : undefined}>
             规范
           </Link>
         </div>
 
         <div className="account">
+          <ThemeSwitch />
           {session === null ? (
             <span className="muted">正在读取登录状态…</span>
           ) : session.authenticated ? (

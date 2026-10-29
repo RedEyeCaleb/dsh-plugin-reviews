@@ -102,7 +102,7 @@ export function PackCreateForm({ folders }: { folders: FolderOption[] }) {
         };
       });
 
-      const result = await apiFetch<{ packId: string; releaseId: string; releaseNumber: number }>('/api/packs', {
+      await apiFetch<{ packId: string; releaseId: string }>('/api/packs', {
         method: 'POST',
         json: {
           title,
@@ -120,7 +120,8 @@ export function PackCreateForm({ folders }: { folders: FolderOption[] }) {
           items: payloadItems,
         },
       });
-      window.location.href = `/packs/${result.packId}`;
+      // 创建的是草稿（未上传）：回个人中心，由作者上传文件后进入审核。
+      window.location.href = '/me/packs';
     } catch (e) {
       setError(e as ApiError);
     } finally {

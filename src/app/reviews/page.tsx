@@ -323,6 +323,27 @@ export default async function ReviewsPage({
                               <h3 className="item-title">
                                 <Link href={`/reviews/${r.review_id}`}>{r.title}</Link>
                               </h3>
+                              {/*
+                                封面缩略图：只有作者设置了封面才显示。没有封面就什么都不放——
+                                列表里堆一串通用占位图，比没有图更吵。
+                              */}
+                              {r.cover_url ? (
+                                <Link href={`/reviews/${r.review_id}`} style={{ display: 'block', margin: '6px 0' }}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={r.cover_url}
+                                    alt={`${r.title} 的封面`}
+                                    style={{
+                                      width: '100%',
+                                      maxWidth: 320,
+                                      height: 140,
+                                      objectFit: 'cover',
+                                      borderRadius: 8,
+                                      display: 'block',
+                                    }}
+                                  />
+                                </Link>
+                              ) : null}
                               <div className="list-meta">
                                 {label === null ? (
                                   <span>插件信息不可用</span>

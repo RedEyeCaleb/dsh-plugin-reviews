@@ -2078,6 +2078,26 @@ button:not(:disabled):active,
   border-color: var(--accent);
 }
 
+/* ---------------------------------------------------------- 页头主题切换 */
+/* 头像旁的小太阳 / 小月亮：只做外观，读写逻辑在 packages/common/theme.ts */
+.theme-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.theme-switch:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ---------------------------------------------------------- 页头账户下拉栏 */
 .account-menu {
   position: relative;

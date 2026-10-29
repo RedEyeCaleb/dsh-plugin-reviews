@@ -225,6 +225,22 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ r
     );
   }
 
+  // 封面：只认本修订固定下来的 cover 引用（提交时从草稿 copy 过来），没有就置空——
+  // 页面退回用代码生成的头图，不伪造图片。
+  const cover = db
+    .prepare(
+      `SELECT a.id AS attachment_id, f.variant_key
+         FROM review_revision_attachment_links l
+         JOIN attachment_files f ON f.id = l.file_id
+         JOIN attachments a ON a.id = f.attachment_id
+        WHERE l.review_revision_id = (
+                SELECT published_revision_id FROM reviews WHERE id = ?
+              )
+          AND l.usage = 'cover' AND f.processing_state = 'ready' AND f.variant_role = 'display'`,
+    )
+    .get(reviewId) as { attachment_id: string; variant_key: string } | undefined;
+  const coverUrl = cover ? `/media/${cover.attachment_id}/${cover.variant_key}` : null;
+
   const pluginVersion = JSON.parse(row.plugin_version) as VersionValue;
   const dshVersion = JSON.parse(row.dsh_version) as VersionValue;
   // 判定与证据：老修订没有 → 如实显示「未给出」，不补写（规范：未测就写未测）。
@@ -285,6 +301,20 @@ export default async function ReviewDetailPage({ params }: { params: Promise<{ r
           3. 正文框 —— 正文被包进一张卡片里，与标题层分开，读起来边界清楚。
       */}
       <article className="article-shell">
+        {/*
+          封面：作者选定的图（正文图或单独上传）。没有封面时不渲染任何占位图片，
+          头图仍由 ArticleHero 生成——"缺省用插件图标占位"在这个版式里就是生成图。
+        */}
+        {coverUrl ? (
+          <figure className="article-cover" style={{ margin: 0 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverUrl}
+              alt={`${row.title} 的封面图`}
+              style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 10 }}
+            />
+          </figure>
+        ) : null}
         {evidenceRefs.length > 0 || (verdictKey && verdictDef(verdictKey).conclusive) ? (
           <section className="panel" style={{ margin: '0 0 16px' }} aria-label="证据链">
             <h2 style={{ fontSize: 15, margin: '0 0 8px' }}>证据链</h2>

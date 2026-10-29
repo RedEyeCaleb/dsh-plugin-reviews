@@ -42,7 +42,8 @@ export async function POST(request: Request): Promise<Response> {
 
     try {
       const service = createPacksService({ db });
-      const result = await service.createPackWithFirstRelease(ctx, body as ReleaseInput);
+      // 创建即草稿：作者上传整合包文件后进入待审核，审核通过才公开。
+      const result = await service.createPackDraft(ctx, body as ReleaseInput);
       return okJson(result, requestId, 201);
     } catch (e) {
       await refundQuietly(ticket);

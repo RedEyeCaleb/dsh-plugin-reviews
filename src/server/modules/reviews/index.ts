@@ -87,6 +87,11 @@ export interface DraftView {
 
 /** 公开修订摘要。 */
 export interface PublishedRevisionSummary {
+  /**
+   * 封面展示图 URL（没有封面时为 null —— 界面退回用插件图标占位，不伪造图片）。
+   * 只取本修订固定下来的 cover 引用，且文件必须 ready。
+   */
+  coverUrl: string | null;
   revisionId: string;
   revisionNumber: number;
   pluginId: string;
@@ -613,7 +618,18 @@ export const reviewsService = {
           )
           .get(review.published_revision_id) as RevisionRow | undefined;
         if (rev) {
+          const cover = conn
+            .prepare(
+              `SELECT a.id AS attachment_id, f.variant_key
+                 FROM review_revision_attachment_links l
+                 JOIN attachment_files f ON f.id = l.file_id
+                 JOIN attachments a ON a.id = f.attachment_id
+                WHERE l.review_revision_id = ? AND l.usage = 'cover'
+                  AND f.processing_state = 'ready' AND f.variant_role = 'display'`,
+            )
+            .get(rev.id) as { attachment_id: string; variant_key: string } | undefined;
           publishedRevision = {
+            coverUrl: cover ? `/media/${cover.attachment_id}/${cover.variant_key}` : null,
             revisionId: rev.id,
             revisionNumber: rev.revision_number,
             pluginId: rev.plugin_id,

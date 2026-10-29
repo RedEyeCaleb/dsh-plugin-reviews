@@ -89,6 +89,9 @@ interface PendingAttachment {
   reason: string | null;
 }
 
+/** 自动保存的静默期（毫秒）：停手 5 秒才写库，改动过程中不打扰。 */
+const AUTOSAVE_DELAY_MS = 5000;
+
 const ALLOWED_MIME = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -189,11 +192,21 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
    */
   const [verdictHint, setVerdictHint] = useState<string | null>(null);
   const [saveVersion, setSaveVersion] = useState(0);
+  /** 自动保存状态：idle 无改动 / pending 有改动待保存 / saving 保存中 / saved 已存 / error 失败。 */
+  const [autoState, setAutoState] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle');
+  /** 上次成功保存的内容指纹：相同就不重复存（避免打开页面就无谓写库）。 */
+  const lastSavedDigestRef = useRef<string | null>(null);
+  /** 自动保存定时器与「正在保存」标志（避免定时器与手动保存重入）。 */
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);
 
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** 当前封面展示图 URL（仅本会话内预览；权威副本在草稿引用里，提交后才公开）。 */
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const coverFileRef = useRef<HTMLInputElement | null>(null);
   const [submission, setSubmission] = useState<SubmitResult | null>(null);
 
   const bodyRef = useRef<HTMLTextAreaElement | null>(null);
@@ -220,6 +233,9 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
       setEvidenceText(formatEvidenceText(data.payload.evidence ?? []));
       setSaveVersion(data.saveVersion);
       setError(null);
+      // 记住「刚载入的内容」：没有改动就不自动保存。
+      lastSavedDigestRef.current = null;
+      setAutoState('idle');
     } catch (e) {
       setError(e as ApiError);
     }
@@ -232,6 +248,26 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
   const payloadPreview = useMemo(
     () => ({ segments: toBodySegments(bodyMarkdown).length, chars: bodyMarkdown.length }),
     [bodyMarkdown],
+  );
+
+  /**
+   * 当前内容的指纹：用于判断「有没有真的改动」。
+   *
+   * 只覆盖会被 PUT 上去的字段（标题/正文/两个版本/档位/判定/证据）——
+   * 光标移动、展开折叠这类纯界面状态不该触发写库。
+   */
+  const contentDigest = useCallback(
+    () =>
+      JSON.stringify({
+        title,
+        bodyMarkdown,
+        pluginVersion,
+        dshVersion,
+        verdict,
+        evidenceText,
+        assessmentLevel,
+      }),
+    [title, bodyMarkdown, pluginVersion, dshVersion, verdict, evidenceText, assessmentLevel],
   );
 
   /** 保存：每次点击生成新的幂等键（这与"重试复用"并不冲突，见 doSave 的 retryKey 参数）。 */
@@ -266,8 +302,20 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
     setBusy(true);
     setError(null);
     setSaved(null);
+    // 手动保存优先：清掉待执行的自动保存，避免两次 PUT 抢同一个 expectedVersion。
+    if (autoTimerRef.current !== null) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+    savingRef.current = true;
+    // 先记住这次要保存的内容指纹：保存期间用户继续打字时，能正确判断"还有新改动待存"。
+    const digestAtSave = contentDigest();
     try {
-      await doSave();
+      const next = await doSave();
+      if (next !== null) {
+        lastSavedDigestRef.current = digestAtSave;
+        setAutoState('saved');
+      }
     } catch (e) {
       const err = e as ApiError;
       setError(err);
@@ -275,12 +323,99 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
         setSaved('检测到版本冲突：草稿已被其他保存更新。请刷新后基于最新版本重试。');
       }
     } finally {
+      savingRef.current = false;
       setBusy(false);
     }
   };
 
+  /**
+   * 自动保存：改动后 **5 秒**无操作就存一次。
+   *
+   * 取舍（写清避免误读）：
+   *   - 是**防抖**不是轮询：只在内容变化后计时，停下来 5 秒才写库；
+   *   - 与手动保存共用一个标志（savingRef），定时器到点时若正在保存就跳过这一轮，
+   *     下一轮改动会重新计时，不会两个 PUT 抢同一个 expectedVersion；
+   *   - 内容与上次保存一致时**不写**（否则打开页面/切标签页也会刷版本号）；
+   *   - 失败不弹 ErrorNotice（自动保存不该打断写作），只在状态条上标「自动保存失败」，
+   *     用户仍可点「保存」重试；
+   *   - 提交审核会自己先保存，所以提交开始时清掉待执行的自动保存。
+   */
+  useEffect(() => {
+    if (draft === null) return;
+    const digest = contentDigest();
+    if (lastSavedDigestRef.current === null) {
+      // 首次载入：记下基线，但不写库。
+      lastSavedDigestRef.current = digest;
+      return;
+    }
+    if (digest === lastSavedDigestRef.current) return;
+
+    setAutoState('pending');
+    if (autoTimerRef.current !== null) clearTimeout(autoTimerRef.current);
+    autoTimerRef.current = setTimeout(() => {
+      autoTimerRef.current = null;
+      void (async () => {
+        if (savingRef.current) {
+          setAutoState('pending');
+          return;
+        }
+        savingRef.current = true;
+        setAutoState('saving');
+        try {
+          const result = await apiFetch<SaveResult>('/api/drafts', {
+            method: 'PUT',
+            json: {
+              draftId,
+              requestKey: newRequestKey(),
+              expectedVersion: saveVersion,
+              title,
+              pluginId: draft.pluginId,
+              pluginVersion,
+              dshVersion,
+              body: toBodySegments(bodyMarkdown),
+              verdict,
+              evidenceRefs: parseEvidenceText(evidenceText),
+              assessmentLevel,
+            },
+          });
+          setSaveVersion(result.saveVersion);
+          lastSavedDigestRef.current = digest;
+          setAutoState('saved');
+        } catch {
+          // 冲突/网络失败都只记状态：写作不打断，明确提示用户手动保存。
+          setAutoState('error');
+        } finally {
+          savingRef.current = false;
+        }
+      })();
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => {
+      if (autoTimerRef.current !== null) clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    };
+  }, [
+    draft,
+    draftId,
+    saveVersion,
+    contentDigest,
+    title,
+    bodyMarkdown,
+    pluginVersion,
+    dshVersion,
+    verdict,
+    evidenceText,
+    assessmentLevel,
+  ]);
+
   /** 提交审核：先 PUT 保存，再用返回的最新版本 PATCH 提交。 */
   const onSubmit = async () => {
+    // 提交会自己先保存：清掉待执行的自动保存，避免并发 PUT。
+    if (autoTimerRef.current !== null) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+    savingRef.current = true;
     setBusy(true);
     setError(null);
     setSaved(null);
@@ -362,8 +497,13 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
     }
   };
 
-  /** 图片上传：登记 → PUT 字节 → 就绪则把图片插到光标处，未就绪则留下记录可继续查。 */
-  const onUpload = async (file: File) => {
+  /**
+   * 图片上传：登记 → PUT 字节 → 就绪则按用途落地：
+   *   - body（默认）：把图片语法插到光标处；
+   *   - cover：记为草稿封面（服务端在就绪时写 draft_attachment_links，提交时固定进修订快照）。
+   * 未就绪时留下记录可继续查状态。
+   */
+  const onUpload = async (file: File, usage: 'body' | 'cover' = 'body') => {
     setUploading(true);
     setError(null);
     try {
@@ -383,12 +523,14 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
       // 第一步：登记（拿附件 id）。登记 ≠ 收到字节。
       const registered = await apiFetch<AttachmentView>(`/api/drafts/${encodeURIComponent(draftId)}/attachments`, {
         method: 'POST',
-        json: { originalFilename: file.name, usage: 'body' },
+        json: { originalFilename: file.name, usage },
       });
 
       // 第二步：PUT 原始字节，content-type 必须是允许的图片类型。
+      // 用途与草稿告诉服务端：封面要落到草稿引用上（而不是只插一段 markdown）。
+      const query = usage === 'cover' ? `?usage=cover&draftId=${encodeURIComponent(draftId)}` : '';
       const ready = await apiFetch<AttachmentView>(
-        `/api/attachments/${encodeURIComponent(registered.attachmentId)}/file`,
+        `/api/attachments/${encodeURIComponent(registered.attachmentId)}/file${query}`,
         {
           method: 'PUT',
           headers: { 'content-type': file.type },
@@ -397,8 +539,13 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
       );
 
       if (ready.processingState === 'ready' && ready.displayUrl) {
-        insertAtCursor(`![${file.name}](${ready.displayUrl})`);
-        setSaved(`图片已插入正文：${ready.displayUrl}`);
+        if (usage === 'cover') {
+          setCoverUrl(ready.displayUrl);
+          setSaved('封面已设置。提交审核后，读者看到的列表与详情会显示这张图。');
+        } else {
+          insertAtCursor(`![${file.name}](${ready.displayUrl})`);
+          setSaved(`图片已插入正文：${ready.displayUrl}`);
+        }
         setPendingAttachment(null);
         return;
       }
@@ -507,6 +654,25 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
       <p className="muted" style={{ fontSize: 14, marginTop: 0 }}>
         草稿 <code>{draftId}</code> · 保存版本 <strong>{saveVersion}</strong> · 正文 {payloadPreview.chars} 字 /{' '}
         {payloadPreview.segments} 段
+        {' · '}
+        {/*
+          自动保存状态：写作过程中最重要的一句反馈。失败时只标红提示，不弹错误框——
+          自动保存不该打断写作；用户仍可点「保存」重试。
+        */}
+        <span
+          className={autoState === 'error' ? 'muted' : 'muted'}
+          style={{ color: autoState === 'error' ? 'var(--danger)' : undefined }}
+        >
+          {autoState === 'idle'
+            ? '自动保存：停笔 5 秒后保存'
+            : autoState === 'pending'
+              ? '自动保存：等待写入…'
+              : autoState === 'saving'
+                ? '自动保存中…'
+                : autoState === 'saved'
+                  ? '已自动保存'
+                  : '自动保存失败，请点「保存」重试'}
+        </span>
       </p>
 
       {/*
@@ -607,8 +773,43 @@ export function ReviewEditor({ draftId }: { draftId: string }) {
               >
                 {uploading ? '上传中…' : '插入图片'}
               </button>
+              <input
+                ref={coverFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void onUpload(file, 'cover');
+                  if (coverFileRef.current) coverFileRef.current.value = '';
+                }}
+              />
+              <button
+                type="button"
+                className="button"
+                disabled={uploading}
+                onClick={() => coverFileRef.current?.click()}
+                title="封面会用在评测列表与详情页顶部；没有封面时用生成的图"
+              >
+                {coverUrl ? '更换封面' : '设置封面'}
+              </button>
             </span>
           </div>
+
+          {/* 封面预览：让作者确认"读者会看到哪张图"，不必等到发布。 */}
+          {coverUrl ? (
+            <div style={{ marginTop: 10 }}>
+              <div className="muted" style={{ fontSize: 13, marginBottom: 4 }}>
+                当前封面（提交后生效）
+              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={coverUrl}
+                alt="封面预览"
+                style={{ maxWidth: 260, width: '100%', height: 'auto', borderRadius: 8, display: 'block' }}
+              />
+            </div>
+          ) : null}
 
           {/* 处理中的附件：可继续查状态。 */}
           {pendingAttachment ? (

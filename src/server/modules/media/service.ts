@@ -230,7 +230,14 @@ export interface MediaService {
   /** 接收完整字节：鉴图 → 生成展示图 → 落盘 → 置 ready。 */
   receiveFile(
     ctx: CallerContext,
-    input: { attachmentId: string; bytes: Buffer },
+    input: {
+      attachmentId: string;
+      bytes: Buffer;
+      /** 这张图在草稿里的用途（默认正文）；封面图会被记进 draft_attachment_links。 */
+      usage?: 'body' | 'cover';
+      /** 用途为封面时必须给出草稿：就绪后建立「草稿 × 文件 × cover」引用。 */
+      draftId?: string;
+    },
   ): Promise<AttachmentView>;
   /** 读取本人有权查看的附件状态。 */
   getAttachment(ctx: CallerContext, attachmentId: string): Promise<AttachmentView>;
@@ -343,6 +350,7 @@ export function createMediaService(deps: MediaServiceDeps): MediaService {
     async receiveFile(ctx, input) {
       assertCanWrite(ctx);
       const userId = ctx.userId;
+      const usage: 'body' | 'cover' = input.usage === 'cover' ? 'cover' : 'body';
 
       // ---- 事务 1：校验归属与当前状态，标记 processing ----
       const pre = withTransaction((tx: Tx) => {
@@ -445,6 +453,25 @@ export function createMediaService(deps: MediaServiceDeps): MediaService {
         tx.db
           .prepare(`UPDATE attachments SET processing_state = 'ready', ready_at = ? WHERE id = ?`)
           .run(now, pre.attachmentId);
+
+        // 封面引用：编辑期记在草稿上（draft_attachment_links），发布时再固定到修订快照。
+        // 只接受**同一用户自己的**草稿，避免借封面把文件挂到别人的草稿上。
+        if (usage === 'cover' && input.draftId !== undefined) {
+          const draft = tx.db
+            .prepare('SELECT owner_id FROM content_drafts WHERE id = ?')
+            .get(input.draftId) as { owner_id: string } | undefined;
+          if (!draft) throw err.unavailable('草稿不存在或不可访问。');
+          if (draft.owner_id !== userId) throw err.forbidden('只能向自己的草稿上传封面。');
+          // 一篇评测只有一个封面：先撤掉旧封面引用再挂新的（与 uq_review_revision_cover 同义）。
+          tx.db
+            .prepare("DELETE FROM draft_attachment_links WHERE draft_id = ? AND usage = 'cover'")
+            .run(input.draftId);
+          tx.db
+            .prepare(
+              "INSERT OR IGNORE INTO draft_attachment_links (draft_id, file_id, usage) VALUES (?, ?, 'cover')",
+            )
+            .run(input.draftId, displayFileId);
+        }
 
         const row = readAttachment(tx.db, pre.attachmentId);
         return toView(row, readDisplayFile(tx.db, pre.attachmentId));

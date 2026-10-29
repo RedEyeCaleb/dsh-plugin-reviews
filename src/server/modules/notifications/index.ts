@@ -26,6 +26,8 @@ export interface NotificationView {
   commentId: string | null;
   /** 内容锚点：评论类必填；处理结果（如资料纠错）可能为空。 */
   contentEntityId: string | null;
+  /** 内容跳转地址（评测 / 整合包版本）；无法解析时为 null。 */
+  href: string | null;
   /** 触发者展示信息（头像缺失时为 null，页面据此回退到文字）。 */
   actorNickname: string;
   actorAvatarUrl: string | null;
@@ -199,9 +201,10 @@ export function createNotificationsService(deps: { db: SqliteDatabase }): Notifi
         .prepare(
           `SELECT n.id, n.kind, n.comment_id, n.content_entity_id, n.read_at, n.created_at,
                   u.nickname AS actor_nickname, u.avatar_url AS actor_avatar_url,
-                  rev.body AS body, n.detail AS detail
+                  ce.content_type, rev.body AS body, n.detail AS detail
              FROM notifications n
              JOIN users u ON u.id = n.actor_id
+             LEFT JOIN content_entities ce ON ce.id = n.content_entity_id
              LEFT JOIN comments c ON c.id = n.comment_id
              LEFT JOIN comment_revisions rev ON rev.id = c.published_revision_id
             WHERE n.recipient_id = ?
@@ -218,9 +221,23 @@ export function createNotificationsService(deps: { db: SqliteDatabase }): Notifi
         created_at: number;
         actor_nickname: string;
         actor_avatar_url: string | null;
+        content_type: string | null;
         body: string | null;
         detail: string | null;
       }>;
+
+      const hrefFor = (entityId: string | null, contentType: string | null): string | null => {
+        if (!entityId) return null;
+        if (contentType === 'pack_release') {
+          const rel = db
+            .prepare('SELECT pack_id, release_number FROM plugin_pack_releases WHERE id = ?')
+            .get(entityId) as { pack_id: string; release_number: number | null } | undefined;
+          if (!rel) return null;
+          return `/packs/${rel.pack_id}${rel.release_number === null ? '' : `?v=${rel.release_number}`}`;
+        }
+        if (contentType === 'review') return `/reviews/${entityId}`;
+        return null;
+      };
 
       return {
         items: rows.map((r) => ({
@@ -228,6 +245,7 @@ export function createNotificationsService(deps: { db: SqliteDatabase }): Notifi
           kind: r.kind,
           commentId: r.comment_id,
           contentEntityId: r.content_entity_id,
+          href: hrefFor(r.content_entity_id, r.content_type),
           actorNickname: r.actor_nickname,
           actorAvatarUrl: r.actor_avatar_url,
           // 处理结果通知没有评论正文，正文位置放它自己的说明

@@ -39,6 +39,8 @@ export interface ReviewSearchRow {
   /** 被测版本（原样 JSON 字符串，页面用既有的 formatVersionLabel 解析）。 */
   plugin_version: string;
   dsh_version: string;
+  /** 封面展示图 URL（没有封面为 null；列表据此决定要不要放缩略图）。 */
+  cover_url: string | null;
 }
 
 /** 候选上限：检索先取候选再逐行判可见性；500 足够覆盖"关键词命中"的常见规模。 */
@@ -212,7 +214,15 @@ export function createSearchService(deps: { db: SqliteDatabase }) {
                       u.nickname AS author_nickname, r.plugin_id,
                       p.display_name AS plugin_display_name, p.plugin_path,
                       repo.full_name AS repo_full_name,
-                      rev.plugin_version, rev.dsh_version
+                      rev.plugin_version, rev.dsh_version,
+                      -- 封面（本修订固定下来的 cover 引用，且文件已就绪）
+                      (SELECT '/media/' || a.id || '/' || f.variant_key
+                         FROM review_revision_attachment_links l
+                         JOIN attachment_files f ON f.id = l.file_id
+                         JOIN attachments a ON a.id = f.attachment_id
+                        WHERE l.review_revision_id = rev.id AND l.usage = 'cover'
+                          AND f.processing_state = 'ready' AND f.variant_role = 'display'
+                        LIMIT 1) AS cover_url
                  FROM reviews r
                  JOIN content_entities ce ON ce.id = r.id
                  JOIN users u ON u.id = ce.author_id
@@ -233,6 +243,7 @@ export function createSearchService(deps: { db: SqliteDatabase }) {
             repo_full_name: string | null;
             plugin_version: string;
             dsh_version: string;
+            cover_url: string | null;
           }>;
           result.push(...found);
         }

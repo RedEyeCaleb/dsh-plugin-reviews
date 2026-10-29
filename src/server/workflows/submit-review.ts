@@ -243,6 +243,16 @@ export async function submitReview(
         now,
       );
 
+    // 3.5) 封面：把草稿上的封面引用固定到修订快照（发布后读者按这条链取图）。
+    //      草稿没有封面就不写——列表页退回用插件图标占位，不伪造封面。
+    tx.db
+      .prepare(
+        `INSERT OR IGNORE INTO review_revision_attachment_links (review_revision_id, file_id, usage)
+         SELECT ?, file_id, 'cover' FROM draft_attachment_links
+          WHERE draft_id = ? AND usage = 'cover'`,
+      )
+      .run(revisionId, draft.id);
+
     // 4) 提交记录。
     const submissionId = newId();
     tx.db

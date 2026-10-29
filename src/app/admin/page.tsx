@@ -20,10 +20,11 @@ import { AdminCategoryPanel } from '@/components/admin-category-panel';
 import { AdminReportPanel } from '@/components/admin-report-panel';
 import { AdminCorrectionPanel } from '@/components/admin-correction-panel';
 import { AdminUserPanel } from '@/components/admin-user-panel';
+import { AdminPackAppealsPanel, type PendingAppeal } from '@/components/admin-pack-appeals-panel';
 import { buildHealthReport } from '@/server/platform/health';
 import { submissionStateLabels } from '@/packages/common/status-text';
 import type { SubmissionState } from '@/packages/common/field-rules';
-import { formatDateTime } from '@/packages/common/time';
+import { formatDateTime, formatDateTimeOr } from '@/packages/common/time';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,6 +101,48 @@ export default async function AdminPage({
           .prepare(`${baseSelect} WHERE s.processing_state = ? ORDER BY s.submitted_at DESC, s.id DESC`)
           .all(selected)
   ) as Row[];
+
+  // 整合包待审数：并入本页「待处理事项」，不再让管理员另记一个入口。
+  const pendingPacks = Number(
+    (db.prepare("SELECT COUNT(*) AS c FROM plugin_pack_releases WHERE review_status = 'pending'").get() as {
+      c: number;
+    }).c,
+  );
+
+  // 复核申请：整合包被退回后作者的申诉，按提交时间正序（先来先处理）。
+  const appealRows = db
+    .prepare(
+      `SELECT a.id, a.release_id, rel.pack_id, rel.title, u.nickname, a.message,
+              a.snapshot_auto_check, a.snapshot_note, a.created_at
+         FROM plugin_pack_appeals a
+         JOIN plugin_pack_releases rel ON rel.id = a.release_id
+         JOIN plugin_packs p ON p.id = rel.pack_id
+         JOIN users u ON u.id = a.author_id
+        WHERE a.state = 'pending'
+        ORDER BY a.created_at ASC, a.id ASC`,
+    )
+    .all() as Array<{
+    id: string;
+    release_id: string;
+    pack_id: string;
+    title: string;
+    nickname: string;
+    message: string;
+    snapshot_auto_check: string | null;
+    snapshot_note: string | null;
+    created_at: number;
+  }>;
+  const pendingAppeals: PendingAppeal[] = appealRows.map((r) => ({
+    appealId: r.id,
+    releaseId: r.release_id,
+    packId: r.pack_id,
+    title: r.title,
+    authorNickname: r.nickname,
+    message: r.message,
+    snapshotAutoCheck: r.snapshot_auto_check,
+    snapshotNote: r.snapshot_note,
+    createdAtText: formatDateTimeOr(r.created_at, '时间未知'),
+  }));
 
   // 站点状态：管理员看到的完整报告（worker 心跳计入结论）。
   const health = buildHealthReport(db, {
@@ -205,6 +248,52 @@ export default async function AdminPage({
         「通过并发布」会记录这次决定，<strong>并同时排入一条发布任务</strong>；真正的发布由 worker
         执行——<strong>worker 没在跑，内容就不会公开</strong>。
       </p>
+
+      {/* 操作记录入口：审计表一直"只写不读"，给它一个查询页面。 */}
+      <section className="panel" style={{ marginTop: 24 }}>
+        <div className="section-head">
+          <h2>操作记录</h2>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          收录、审核决定、可见性调整、用户管理等动作的审计留痕（只读，不可改）。要查「谁在什么时候
+          因为什么改了这个对象」就来这里。
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          <Link href="/admin/operations">前往操作记录 →</Link>
+        </p>
+      </section>
+
+      {/* 复核申请：先于审核入口出现——已经等着的作者比新提交更该先被看到。 */}
+      <section className="panel" style={{ marginTop: 24 }}>
+        <div className="section-head">
+          <h2>复核申请</h2>
+          <span className={pendingAppeals.length > 0 ? 'tag warn' : 'tag site'}>
+            {pendingAppeals.length > 0 ? `${pendingAppeals.length} 条待处理` : '无待处理'}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          作者认为自动检查 / 安装资料核验 / 人工审核判错了。改判会直接发布该版本；维持原判必须写理由，
+          结果会通知作者。
+        </p>
+        <AdminPackAppealsPanel items={pendingAppeals} />
+      </section>
+
+      {/* 整合包审核入口：与评测审核并列，避免"待处理事项"只覆盖评测。 */}
+      <section className="panel" style={{ marginTop: 24 }}>
+        <div className="section-head">
+          <h2>整合包审核</h2>
+          <span className={pendingPacks > 0 ? 'tag warn' : 'tag site'}>
+            {pendingPacks > 0 ? `${pendingPacks} 个待审核` : '无待审核'}
+          </span>
+        </div>
+        <p className="muted" style={{ marginTop: 0 }}>
+          整合包版本提交后先过自动检查；需要人工判断的（含外部链接、安装资料无法自动核验）会进入这里。
+          通过后分配「第 N 版」并公开，拒绝后作者可修改再提交。
+        </p>
+        <p style={{ marginBottom: 0 }}>
+          <Link href="/admin/packs">前往整合包审核 →</Link>
+        </p>
+      </section>
 
       {/* 站点状态：管理员视角的完整报告。 */}
       <section className="panel" style={{ marginTop: 24 }}>

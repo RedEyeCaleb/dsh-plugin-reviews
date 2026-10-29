@@ -14,6 +14,7 @@ import { currentContext } from '../api/_lib/context';
 import { listDraftSummaries } from '@/server/modules/reviews';
 import { MeNav } from '@/components/me-nav';
 import { DraftList } from '@/components/draft-list';
+import { BulkMarkdownImport } from '@/components/bulk-markdown-import';
 import { submissionStateLabels } from '@/packages/common/status-text';
 import type { SubmissionState } from '@/packages/common/field-rules';
 import { formatDateTime } from '@/packages/common/time';
@@ -218,6 +219,9 @@ export default async function MePage({
                 {q ? `（搜索：${q}）` : ''}
               </h2>
             </div>
+
+            {/* 批量导入：只在草稿页出现（提交过的评测不该被"导入"覆盖）。 */}
+            {tab === 'drafts' ? <BulkMarkdownImport /> : null}
 
             {tab === 'drafts' ? (
               draftSummaries.length === 0 ? (

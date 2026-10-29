@@ -280,13 +280,13 @@ describe('整合包：发布与快照', () => {
     );
 
     expect(await service.togglePackFavorite(caller(db, reader), created.packId, db)).toEqual({ favorited: true });
-    const favorites = await service.listFavoritePacks(caller(db, reader), db);
-    expect(favorites).toHaveLength(1);
-    expect(favorites[0]!.packId).toBe(created.packId);
-    expect(favorites[0]!.favoriteCount).toBe(1);
+    const favorites = await service.listFavoritePacks(caller(db, reader), {}, db);
+    expect(favorites.items).toHaveLength(1);
+    expect(favorites.items[0]!.packId).toBe(created.packId);
+    expect(favorites.items[0]!.favoriteCount).toBe(1);
 
     expect(await service.togglePackFavorite(caller(db, reader), created.packId, db)).toEqual({ favorited: false });
-    expect(await service.listFavoritePacks(caller(db, reader), db)).toHaveLength(0);
+    expect((await service.listFavoritePacks(caller(db, reader), {}, db)).items).toHaveLength(0);
   });
 });
 

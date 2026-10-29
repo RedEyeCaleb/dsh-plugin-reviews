@@ -8,25 +8,13 @@
  */
 
 import { useEffect, useState } from 'react';
-
-type Theme = 'light' | 'dark';
-
-function readTheme(): Theme {
-  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
-}
+import { applyTheme, readTheme, type Theme } from '@/packages/common/theme';
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('light');
 
   const apply = (next: Theme) => {
-    document.documentElement.dataset.theme = next;
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', next === 'dark' ? '#121810' : '#f6f8f1');
-    try {
-      localStorage.setItem('dsh-theme', next);
-    } catch {
-      // 隐私模式下 localStorage 可能不可写：主题仍然即时生效，只是不记住。
-    }
+    applyTheme(next);
     setTheme(next);
   };
 

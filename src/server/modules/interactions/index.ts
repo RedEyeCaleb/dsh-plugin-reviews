@@ -127,8 +127,22 @@ function ensureDefaultFolderInTx(conn: SqliteDatabase, userId: string): { id: st
 /** 目标是否存在且"当前公开"——决定能不能投票/举报。 */
 function assertTargetPublic(db: SqliteDatabase, target: { kind: ReportTargetKind; id: string }): string {
   if (target.kind === 'pack_release') {
-    // 整合包版本在 P4 才放开 content_type 闸门；现在遇到就直接拒绝，别留下指向空气的举报。
-    throw err.input('整合包版本的举报将在整合包上线后开放。', [{ path: 'targetId', message: '暂不支持' }]);
+    const row = db.prepare('SELECT id, content_type FROM content_entities WHERE id = ?').get(target.id) as
+      | { id: string; content_type: string }
+      | undefined;
+    if (!row || row.content_type !== 'pack_release') {
+      throw err.unavailable('要举报的整合包版本不存在。');
+    }
+    const rel = db
+      .prepare('SELECT release_number FROM plugin_pack_releases WHERE id = ?')
+      .get(target.id) as { release_number: number | null } | undefined;
+    if (!rel || rel.release_number === null) {
+      throw err.unavailable('该整合包版本尚未发布，无法举报。');
+    }
+    if (!resolveVisibilityInTx(db, target.id).publiclyVisible) {
+      throw err.unavailable('该整合包版本当前不可见，无法举报。');
+    }
+    return target.id;
   }
 
   if (target.kind === 'review') {
@@ -203,9 +217,37 @@ function describeTarget(
           WHERE c.id = ?`,
       )
       .get(target.commentId) as { body: string } | undefined;
+    // 评论可能挂在评测或整合包版本上：跳转地址按公共内容类型解析。
+    let href = `/reviews/${target.contentEntityId}`;
+    const entity = db
+      .prepare('SELECT content_type FROM content_entities WHERE id = ?')
+      .get(target.contentEntityId) as { content_type: string } | undefined;
+    if (entity?.content_type === 'pack_release') {
+      const rel = db
+        .prepare('SELECT pack_id, release_number FROM plugin_pack_releases WHERE id = ?')
+        .get(target.contentEntityId) as { pack_id: string; release_number: number | null } | undefined;
+      if (rel) {
+        href = `/packs/${rel.pack_id}${rel.release_number === null ? '' : `?v=${rel.release_number}`}`;
+      }
+    }
     return {
       excerpt: (row?.body ?? '（评论）').replace(/\s+/g, ' ').slice(0, EXCERPT_MAX),
-      href: `/reviews/${target.contentEntityId}`,
+      href,
+    };
+  }
+  if (target.kind === 'pack_release') {
+    const row = db
+      .prepare(
+        'SELECT rel.title, rel.pack_id, rel.release_number FROM plugin_pack_releases rel WHERE rel.id = ?',
+      )
+      .get(target.id) as
+      | { title: string; pack_id: string; release_number: number | null }
+      | undefined;
+    return {
+      excerpt: (row?.title ?? '（整合包版本）').slice(0, EXCERPT_MAX),
+      href: row
+        ? `/packs/${row.pack_id}${row.release_number === null ? '' : `?v=${row.release_number}`}`
+        : '/',
     };
   }
   return { excerpt: '（整合包版本）', href: '/' };

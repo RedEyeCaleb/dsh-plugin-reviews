@@ -1133,6 +1133,49 @@ describe('moderation.decideByAdmin', () => {
     expect(records[0]!.result).toBe('pass');
   });
 
+  it('审核结果通知作者：approve / needs_changes 各一条 moderation_result', async () => {
+    const { db } = setup();
+    const mod = createModerationService(db);
+    const adminId = insertUser(db, { role: 'admin' });
+
+    // 通过
+    const ok = insertReviewSubmission(db, { state: 'manual_review' });
+    await mod.decideByAdmin(adminCtx(adminId), {
+      submissionId: ok.submissionId,
+      decision: 'approve',
+      reason: '人工确认无问题',
+      expectedStateVersion: 0,
+      requestKey: 'notify-req-1',
+    });
+    const okNotice = db
+      .prepare("SELECT detail, content_entity_id, actor_id FROM notifications WHERE deduplication_key = ?")
+      .get('review_decision:' + ok.submissionId + ':notify-req-1') as
+      | { detail: string; content_entity_id: string | null; actor_id: string }
+      | undefined;
+    expect(okNotice).toBeTruthy();
+    expect(okNotice?.detail).toContain('通过审核');
+    const entity = db.prepare('SELECT review_id FROM review_revisions WHERE id = ?').get(ok.revisionId) as {
+      review_id: string;
+    };
+    expect(okNotice?.content_entity_id).toBe(entity.review_id);
+    expect(okNotice?.actor_id).toBe(adminId);
+
+    // 需修改：理由进通知正文
+    const bad = insertReviewSubmission(db, { state: 'manual_review' });
+    await mod.decideByAdmin(adminCtx(adminId), {
+      submissionId: bad.submissionId,
+      decision: 'needs_changes',
+      reason: '描述不足，请补充实测步骤',
+      expectedStateVersion: 0,
+      requestKey: 'notify-req-2',
+    });
+    const badNotice = db
+      .prepare('SELECT detail FROM notifications WHERE deduplication_key = ?')
+      .get('review_decision:' + bad.submissionId + ':notify-req-2') as { detail: string } | undefined;
+    expect(badNotice?.detail).toContain('需要修改');
+    expect(badNotice?.detail).toContain('实测步骤');
+  });
+
   it('管理员 needs_changes → needs_changes', async () => {
     const { db } = setup();
     const mod = createModerationService(db);

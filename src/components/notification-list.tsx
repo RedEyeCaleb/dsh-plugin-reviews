@@ -17,9 +17,10 @@ import { SkeletonLines } from './skeleton';
 
 interface NotificationItem {
   id: string;
-  kind: 'comment_on_content' | 'reply_to_comment';
-  commentId: string;
-  contentEntityId: string;
+  kind: 'comment_on_content' | 'reply_to_comment' | 'moderation_result';
+  commentId: string | null;
+  contentEntityId: string | null;
+  href: string | null;
   actorNickname: string;
   actorAvatarUrl: string | null;
   excerpt: string;
@@ -135,7 +136,11 @@ export function NotificationList() {
             >
               <div style={{ fontSize: 14 }}>
                 <strong>{n.actorNickname}</strong>
-                {n.kind === 'reply_to_comment' ? ' 回复了你的评论' : ' 评论了你的内容'}
+                {n.kind === 'reply_to_comment'
+                  ? ' 回复了你的评论'
+                  : n.kind === 'moderation_result'
+                    ? ' 处理结果'
+                    : ' 评论了你的内容'}
                 <span className="muted">
                   {' · '}
                   {formatDateTime(n.createdAt)}
@@ -144,9 +149,11 @@ export function NotificationList() {
               </div>
               <div style={{ marginTop: 6, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>{n.excerpt}</div>
               <div style={{ marginTop: 6, display: 'flex', gap: 12, alignItems: 'center' }}>
-                <Link href={`/reviews/${n.contentEntityId}`} className="link-btn">
-                  去看这条内容
-                </Link>
+                {n.href ? (
+                  <Link href={n.href} className="link-btn">
+                    去看这条内容
+                  </Link>
+                ) : null}
                 {n.readAt === null ? (
                   <button type="button" disabled={busy} onClick={() => void markOne(n.id)} className="link-btn muted">
                     标为已读

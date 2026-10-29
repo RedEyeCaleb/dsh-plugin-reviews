@@ -28,6 +28,7 @@ import type {
 } from '@/packages/common/field-rules';
 import type { FieldError } from '@/packages/common/errors';
 import { err } from '@/packages/common/errors';
+import { deliverModerationResultNotification } from '@/server/modules/notifications';
 
 /** 处理记录阶段（与 0001 §3.4 的 CHECK 一致）。 */
 export type ModerationStage = 'rule_check' | 'content_screen' | 'manual_review' | 'publish';
@@ -507,6 +508,33 @@ export function createModerationService(db: SqliteDatabase, options: ModerationO
           to,
           reason: input.reason,
         });
+
+        // 审核结果通知作者：此前人工决定只写记录、作者只能自己回来刷新页面看状态。
+        // 评测修订挂在自己的 content_entities 上（发布后就是那篇评测），评论修订同理。
+        // 找不到内容锚点时不发（宁可不发，也不发一条指向空气的通知）。
+        const anchor = handle
+          .prepare(
+            `SELECT ce.id AS content_entity_id, ce.author_id AS author_id
+               FROM content_submissions s
+               JOIN review_revisions rr ON rr.id = s.review_revision_id
+               JOIN content_entities ce ON ce.id = rr.review_id
+              WHERE s.id = ?`,
+          )
+          .get(input.submissionId) as { content_entity_id: string; author_id: string } | undefined;
+        if (anchor) {
+          deliverModerationResultNotification(handle, {
+            recipientId: anchor.author_id,
+            actorId: adminId,
+            contentEntityId: anchor.content_entity_id,
+            detail:
+              input.decision === 'approve'
+                ? '你的评测已通过审核，正在发布。'
+                : `你的评测需要修改后才能发布：${input.reason.trim() || '请按审核意见修改后重新提交。'}`,
+            deduplicationKey: `review_decision:${input.submissionId}:${input.requestKey}`,
+            now,
+          });
+        }
+
         return { state: to, stateVersion: out.stateVersion };
       }, db);
     },

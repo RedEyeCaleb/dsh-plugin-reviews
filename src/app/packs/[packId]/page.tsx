@@ -15,6 +15,9 @@ import { formatVersionLabel } from '@/packages/common/status-text';
 import { formatDateTimeOr } from '@/packages/common/time';
 import { CopyButton } from '@/components/copy-button';
 import { PackFavoriteButton } from '@/components/pack-favorite-button';
+import { PackHelpfulButton } from '@/components/pack-helpful-button';
+import { ReportButton } from '@/components/report-button';
+import { CommentSection } from '@/components/comment-section';
 import { BackLink } from '@/components/back-link';
 import { currentContext } from '@/app/api/_lib/context';
 import { DomainError } from '@/packages/common/errors';
@@ -53,6 +56,28 @@ export default async function PackDetailPage({
   const packReviews = (await createPackReviewsService({ db: getDb() }).listPackReviews(ctx)).filter(
     (review) => review.packId === packId,
   );
+  const packService = createPacksService({ db: getDb() });
+  const helpful = selected
+    ? await packService.helpfulStateForRelease(selected.releaseId, ctx.userId)
+    : { helpful: false, count: 0 };
+  const installChecks = new Map<number, { state: string; detail: string | null }>();
+  if (selected) {
+    const checkRows = getDb()
+      .prepare(
+        `SELECT i.position, ic.state, ic.detail
+           FROM plugin_install_checks ic
+           JOIN plugin_pack_release_items i ON i.id = ic.release_item_id
+          WHERE i.release_id = ?
+            AND ic.check_sequence = (
+              SELECT MAX(x.check_sequence) FROM plugin_install_checks x
+               WHERE x.release_item_id = ic.release_item_id
+            )`,
+      )
+      .all(selected.releaseId) as Array<{ position: number; state: string; detail: string | null }>;
+    for (const row of checkRows) {
+      installChecks.set(row.position, { state: row.state, detail: row.detail });
+    }
+  }
   const bodyHtml = selected ? renderMarkdownToSafeHtml(selected.bodyMarkdown) : '';
 
   return (
@@ -79,6 +104,21 @@ export default async function PackDetailPage({
             initialCount={detail.favoriteCount}
             authenticated={ctx.userId !== null}
           />
+          {selected ? (
+            <>
+              <PackHelpfulButton
+                releaseId={selected.releaseId}
+                initialCount={helpful.count}
+                initialHelpful={helpful.helpful}
+                authenticated={ctx.userId !== null}
+              />
+              <ReportButton
+                targetKind="pack_release"
+                targetId={selected.releaseId}
+                authenticated={ctx.userId !== null}
+              />
+            </>
+          ) : null}
         </div>
       </header>
 
@@ -175,6 +215,19 @@ export default async function PackDetailPage({
                     <span className="muted">{formatVersionLabel('插件', item.pluginVersion)}</span>
                     {item.purpose ? <span className="muted">—— {item.purpose}</span> : null}
                   </div>
+
+                  {installChecks.has(item.position) ? (
+                    <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
+                      安装核验：
+                      {(() => {
+                        const check = installChecks.get(item.position);
+                        if (check?.state === 'ok') return '已核验通过';
+                        if (check?.state === 'failed') return `核验未通过（${check.detail ?? '目标不存在'}）`;
+                        if (check?.state === 'pending') return '核验中';
+                        return '待核实（缺少安装目标）';
+                      })()}
+                    </div>
+                  ) : null}
 
                   {item.command !== null ? (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
@@ -287,6 +340,7 @@ export default async function PackDetailPage({
               </p>
             </section>
           ) : null}
+          {selected ? <CommentSection contentId={selected.releaseId} /> : null}
         </>
       )}
     </div>
