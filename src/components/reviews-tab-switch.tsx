@@ -18,7 +18,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type MouseEvent, type ReactNode } from 'react';
+import { prefersReducedMotion } from './motion/engine';
 
 /** 离场方向存在 sessionStorage 里，因为它要跨过一次客户端导航。 */
 const DIR_KEY = 'reviews-switch-dir';
@@ -31,13 +32,6 @@ const DIR_TTL_MS = 2000;
 
 type Direction = 'fwd' | 'back';
 
-function prefersReduced(): boolean {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * 读取（但**不**立刻删除）上一步记下的方向。
@@ -117,7 +111,7 @@ export function ReviewsTabSwitchLink({
     event.preventDefault();
 
     const panel = document.querySelector<HTMLElement>('[data-reviews-panel]');
-    if (prefersReduced() || panel === null) {
+    if (prefersReducedMotion() || panel === null) {
       router.push(href);
       return;
     }
@@ -172,14 +166,15 @@ export function ReviewsTabSwitchLink({
 export function ReviewsTabPanel({ tab, children }: { tab: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // useLayoutEffect：入场类要在绘制前挂上，否则新面板先亮一帧再跳回 opacity:0（闪一下）
+  useLayoutEffect(() => {
     const panel = ref.current;
     if (panel === null) return;
 
     // 上一次的离场类名可能还挂在这个节点上（热更新 / 后退缓存），先摘干净再入场
     panel.classList.remove('reviews-tab-out-fwd', 'reviews-tab-out-back');
 
-    const direction = prefersReduced() ? null : readDirection();
+    const direction = prefersReducedMotion() ? null : readDirection();
     if (direction === null) {
       clearDirection();
       return;

@@ -1998,35 +1998,55 @@ label {
   }
 }
 
-/* ============================================================ 动效层（fx-）
+/* ============================================================ 动效层（motion-）
  *
- * 参考工作区 `面板\panel\cmd\panel\web\motion.css` 的做法，按同一套家规自建一层：
- *   1. **入场是一次性的**：加类 → 动画跑完（或超时兜底）就摘类，
- *      否则客户端重渲染 / HMR 会把入场动画重播一次，看着像闪屏；
- *   2. **只动 transform / opacity / color**，绝不动 width/height/top/left 这类布局属性 ——
- *      动布局会连累滚动位置与命中区域；
- *   4. `prefers-reduced-motion: reduce` 下**全部关闭**（本文件末尾有总开关，
- *      且 JS 侧在开启减少动效时连类都不加）。
+ * 与参考工作区 `面板\panel\cmd\panel\web\motion.css` 同一套家规，规则本身写在
+ * `src/components/motion/engine.ts`（JS 侧：什么时候加类、什么时候摘类、减少动效时不加类）。
+ * 这里只负责"长什么样"，四条纪律：
+ *   1. **入场一次性**：JS 加类 → 动画跑完 → 摘类，永不常驻（否则重渲染会重播，像闪屏）；
+ *   2. **只动 transform / opacity / color**：绝不动 width/height/top/left，不动布局；
+ *   3. 时长 120–340ms（用 M3 令牌），手感要跟手；
+ *   4. `prefers-reduced-motion: reduce` 全部关闭（文件末尾有总开关，JS 侧也不会加类）。
  *
- * 与参照站不同的地方（我们自己的判断）：这里没有做"整页滑动/快照过渡"，
- * 因为评测站是长文阅读场景，滑动会打断阅读节奏；只保留入场、微交互、加载骨架三类。 */
+ * 命名统一成三组，一眼能看出归属：
+ *   `m-*`      keyframes（m-rise / m-slide-right / m-ripple …）
+ *   `motion-*` 由 JS 一次性挂上的入场类
+ *   `.is-*`    状态类（如 .is-tick）
+ */
 
-@keyframes fx-rise {
-  from { opacity: 0; transform: translate3d(0, 10px, 0); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes fx-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes fx-pop {
-  from { opacity: 0; transform: scale(0.97); }
-  to { opacity: 1; transform: none; }
-}
-/* 顶栏栏目切换：MD3 shared axis X —— 新内容从左侧/右侧 28px 滑入并淡入 */
-@keyframes fx-slide-right {
+/* ---------------------------------------------------------------- keyframes */
+@keyframes m-rise {
   from {
     opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes m-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* 栏目切换：MD3 shared axis X —— 前进从右 28px 滑入、后退从左 */
+@keyframes m-slide-right {
+  from {
+    opacity: 0.4;
     transform: translate3d(28px, 0, 0);
   }
   to {
@@ -2034,9 +2054,9 @@ label {
     transform: none;
   }
 }
-@keyframes fx-slide-left {
+@keyframes m-slide-left {
   from {
-    opacity: 0;
+    opacity: 0.4;
     transform: translate3d(-28px, 0, 0);
   }
   to {
@@ -2044,16 +2064,8 @@ label {
     transform: none;
   }
 }
-.fx-slide-right {
-  animation: fx-slide-right var(--md-sys-motion-duration-medium2)
-    var(--md-sys-motion-easing-emphasized-decelerate) both;
-}
-.fx-slide-left {
-  animation: fx-slide-left var(--md-sys-motion-duration-medium2)
-    var(--md-sys-motion-easing-emphasized-decelerate) both;
-}
 /* 账户下拉：从触发键下方滑下（MD3 menu 的 enter） */
-@keyframes fx-menu-down {
+@keyframes m-menu-down {
   from {
     opacity: 0;
     transform: translate3d(0, -8px, 0) scale(0.98);
@@ -2063,36 +2075,140 @@ label {
     transform: none;
   }
 }
-@keyframes fx-sheen {
-  from { background-position: -140% 0; }
-  to { background-position: 240% 0; }
+@keyframes m-sheen {
+  from {
+    background-position: -140% 0;
+  }
+  to {
+    background-position: 240% 0;
+  }
+}
+/* 涟漪：M3 规格（约 12% 不透明度起、铺满控件） */
+@keyframes m-ripple {
+  from {
+    opacity: 0.12;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+/* 值刚变过：亮一下主色再落回原色（配合数字滚动，指认"这块更新了"） */
+@keyframes m-tick {
+  from {
+    color: var(--md-sys-color-primary);
+    transform: translate3d(0, -1px, 0);
+  }
+  to {
+    color: inherit;
+    transform: none;
+  }
+}
+/* 未读红点：持续的呼吸（常驻节点才能循环；重建的节点循环会抖） */
+@keyframes m-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
-/* —— 入场：容器加上 .fx-enter 后，直接子元素按 --i 依次升起 —— */
-.fx-enter > * {
+/* ------------------------------------------------------------ 栏目切换 / 入场 */
+.motion-slide-in-right {
+  animation: m-slide-right var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+.motion-slide-in-left {
+  animation: m-slide-left var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+/* 页面入场：容器加 `.motion-enter`，直接子元素按 --i 依次升起 */
+.motion-enter > * {
+  animation: m-rise var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
   animation-delay: calc(var(--i, 0) * 45ms);
 }
 /* 第 13 个之后不再递增（否则长列表要等 1 秒才开始出现） */
-.fx-enter > *:nth-child(n + 13) {
+.motion-enter > *:nth-child(n + 13) {
   animation-delay: 0.54s;
 }
 /* 列表行与表格行：步长更小，因为行数可能很多 */
-.fx-rows > * {
+.motion-rows > * {
+  animation: m-rise var(--md-sys-motion-duration-medium1)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
   animation-delay: calc(var(--i, 0) * 22ms);
 }
-.fx-rows > *:nth-child(n + 17) {
+.motion-rows > *:nth-child(n + 17) {
   animation-delay: 0.35s;
 }
+/* 详情页面板：由 JS 按视觉顺序逐个挂上（所以这里用类，不用父选择器） */
+.motion-panel {
+  animation: m-rise var(--md-sys-motion-duration-medium2)
+    var(--md-sys-motion-easing-emphasized-decelerate) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+/* ------------------------------------------------------------------ 状态类 */
+.is-tick {
+  animation: m-tick 0.7s var(--md-sys-motion-easing-standard) both;
+}
+
+/* ---------------------------------------------------------------- 按压涟漪 */
+.ripple-host {
+  position: relative;
+  overflow: hidden;
+}
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  pointer-events: none;
+  animation: m-ripple var(--md-sys-motion-duration-long4)
+    var(--md-sys-motion-easing-emphasized-decelerate) forwards;
+}
+
+/* ------------------------------------------------------------ 按压 / 悬停反馈
+   只给"能按的东西"加 transform 过渡；固定定位的（回到顶部）不参与，
+   否则 :active 期间会临时成为 containing block。 */
+button:not(:disabled),
+.button,
+.menu-row,
+.icon-btn,
+.back-link,
+.filters a {
+  transition:
+    background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    border-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-short2) var(--md-sys-motion-easing-standard);
+}
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):active,
+  .button:active,
+  .menu-row:active,
+  .icon-btn:active {
+    transform: translateY(1px) scale(0.985);
+  }
+}
+
+/* ------------------------------------------------------ 沿途的小入场（非 JS） */
 /* 提示条：出现时轻微弹入（错误/成功提示都是"刚发生的事"） */
 .notice {
-  animation: fx-pop 0.22s cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  animation: m-pop 0.22s cubic-bezier(0.2, 0.7, 0.25, 1) both;
 }
 /* 正文图片：一次淡入，避免长文里的图片"啪"地跳出来 */
 .review-body img {
-  animation: fx-fade 0.45s ease both;
+  animation: m-fade 0.45s ease both;
+}
+/* 未读红点 */
+.menu-dot {
+  animation: m-dot 2.4s ease-in-out infinite;
 }
 
-/* —— 加载骨架（参照站 .sk 的做法：一条横向流光）—— */
+/* —— 加载骨架（一条横向流光）—— */
 .sk {
   display: block;
   border-radius: 8px;
@@ -2103,7 +2219,7 @@ label {
     color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent) 52%
   );
   background-size: 220% 100%;
-  animation: fx-sheen 1.4s linear infinite;
+  animation: m-sheen 1.4s linear infinite;
 }
 .sk-md {
   height: 15px;
@@ -2163,17 +2279,7 @@ button:not(:disabled):active,
   border: 0;
 }
 
-/* 按压涟漪（由 motion-runtime 在 pointerdown 时插入一个 span） */
-.fx-ripple-host {
-  position: relative;
-  overflow: hidden;
-}
-.fx-ripple {
-  position: absolute;
-  border-radius: 50%;
-  background: currentColor;
-  pointer-events: none;
-}
+/* 按压涟漪的宿主样式在动效层（`.ripple-host` / `.ripple`，见文件上方 motion- 段） */
 
 @media (hover: hover) and (pointer: fine) {
   /* 桌面精确指针才给卡片抬升：触屏上"悬停"会粘住 */
@@ -2198,7 +2304,7 @@ button:not(:disabled):active,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  animation: fx-pop 0.22s cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  animation: m-pop 0.22s cubic-bezier(0.2, 0.7, 0.25, 1) both;
 }
 .back-to-top:hover {
   border-color: var(--accent);
@@ -2235,7 +2341,7 @@ button:not(:disabled):active,
   z-index: 1002;
   width: 264px;
   transform-origin: top right;
-  animation: fx-menu-down var(--md-sys-motion-duration-short4)
+  animation: m-menu-down var(--md-sys-motion-duration-short4)
     var(--md-sys-motion-easing-emphasized-decelerate) both;
 }
 /* 头像：触发键里是 22px 小圆，菜单头部是 36px 圆 */
@@ -2516,16 +2622,7 @@ aside h2 {
   height: 8px;
   border-radius: 50%;
   background: var(--md-sys-color-error);
-  animation: fx-dot 2.4s ease-in-out infinite;
-}
-@keyframes fx-dot {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
+  /* 呼吸动画在动效层的 `.menu-dot` 规则里（m-dot） */
 }
 
 /* 面板里最后一排是 chip 行时，不要留下外边距 —— 否则面板上下留白不相等
@@ -3129,31 +3226,7 @@ input[type='search']:focus {
   box-shadow: none;
 }
 
-/* ------------------------------------------------------------- 涟漪（M3 规格）
-   M3：600ms（duration-long4）、emphasized-decelerate、起始不透明度约 12%，铺满整个组件。 */
-.fx-ripple {
-  animation: fx-ripple var(--md-sys-motion-duration-long4)
-    var(--md-sys-motion-easing-emphasized-decelerate) forwards;
-}
-@keyframes fx-ripple {
-  from {
-    opacity: 0.12;
-    transform: scale(0.2);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-}
-/* 入场动效改用 M3 令牌（emphasized-decelerate + medium2 300ms） */
-.fx-enter > * {
-  animation: fx-rise var(--md-sys-motion-duration-medium2)
-    var(--md-sys-motion-easing-emphasized-decelerate) both;
-}
-.fx-rows > * {
-  animation: fx-rise var(--md-sys-motion-duration-medium1)
-    var(--md-sys-motion-easing-emphasized-decelerate) both;
-}
+/* 涟漪与入场类的定义都已收进文件上方的 motion- 动效层，这里不再重复 */
 
 /* ------------------------------------------------- 内容区留白（M3 布局栅格） */
 :root {
@@ -3258,7 +3331,7 @@ input[type='search']:focus {
   inset: 0;
   z-index: 1200;
   background: color-mix(in srgb, var(--md-sys-color-scrim) 44%, transparent);
-  animation: fx-fade var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard) both;
+  animation: m-fade var(--md-sys-motion-duration-medium1) var(--md-sys-motion-easing-standard) both;
 }
 /* 菜单行的**共用布局**：下拉菜单与侧边抽屉都用它。
    ⚠️ 之前这套 display:flex 只写在 `.account-dropdown .menu-row` 里，抽屉里的行因此没有布局规则，
