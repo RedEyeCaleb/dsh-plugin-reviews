@@ -798,6 +798,7 @@ p {
 .reviews-switch-head {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 8px 12px;
   margin: 0 0 16px;
@@ -835,13 +836,14 @@ p {
 }
 
 /* 说明胶囊：告诉读者这里还有另一个页签（M3 assist chip 形态）。
-   它和标题指向同一个去向 —— 长得像按钮却不响应点击，会让人以为站点坏了。 */
+   它和标题指向同一个去向 —— 长得像按钮却不响应点击，会让人以为站点坏了。
+   图标按主人要求去掉，只留文字。 */
 .reviews-switch-hint {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin: 0;
-  padding: 4px 12px 4px 10px;
+  padding: 4px 12px;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--md-sys-shape-corner-full);
   background: color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent);
@@ -860,10 +862,6 @@ p {
   background: color-mix(in srgb, var(--md-sys-color-primary) 13%, transparent);
   color: var(--md-sys-color-on-surface);
   text-decoration: none;
-}
-.reviews-switch-hint svg {
-  flex: 0 0 auto;
-  color: var(--md-sys-color-primary);
 }
 
 /* 页签面板的出入场：MD3 shared axis X（只动 transform / opacity） */
@@ -2670,23 +2668,36 @@ input[type='search']:focus {
 /* 桌面端两栏等高：插件栏把 10 条均分到面板剩余高度，正好填满圆角，
    不再在按钮下面留一大块空白（主人要求：大小刚好占据这个圆角）。 */
 @media (min-width: 901px) {
-  /* 桌面首页：压进一屏（常见 1392 高的窗口去掉浏览器 chrome ≈1272），
-     避免滚轮还能轻微拖动整页。只影响首页。 */
+  /* 桌面首页：**一屏，不滚动**（主人 2026-11-10 要求）。
+     条目高度是固定的，所以"一屏"只能靠两件事一起做：
+       1. 收紧纵向间距（页头留白、英雄区、面板内边距、栏目头）；
+       2. 屏高不够时按档位少放几条（见下面的 max-height 分档）——
+          宁可少两条，也不要让整页出现一条滚不动的滚动条。
+     两栏等高、按钮贴底：两个面板都改成 flex 纵向，"查看全部"用 margin-top:auto 顶到底。 */
   .site-main:has(.home-page) {
-    padding-bottom: 24px;
+    padding-top: calc(var(--header-height) + 28px);
+    padding-bottom: 20px;
   }
   html:has(.home-page) {
     overscroll-behavior-y: none;
   }
   .home-page .home-hero {
-    padding-bottom: 20px;
+    padding-top: 0;
+    padding-bottom: 12px;
+  }
+  .home-page .home-feed > .panel {
+    padding: 20px;
+  }
+  .home-page .home-feed .section-head {
+    margin-bottom: 12px;
   }
   .home-page .home-feed section .item-list > .item {
     padding-top: 10px;
     padding-bottom: 10px;
   }
 
-  .home-feed aside.panel {
+  /* 两栏都按纵向 flex 排：列表占满剩余高度，按钮固定在面板底部 */
+  .home-page .home-feed > .panel {
     display: flex;
     flex-direction: column;
   }
@@ -2699,6 +2710,106 @@ input[type='search']:focus {
      一路压穿文字行高（见上条注释）。这里把收缩基线换成上面给的最小高度。 */
   .home-feed aside .home-plugin-list > .home-plugin-item {
     flex: 1 1 auto;
+  }
+  .home-page .home-feed .home-more {
+    margin-top: auto;
+    padding-top: 12px;
+  }
+}
+
+/* 首页一屏分档：屏高每降一档就少放一条。
+   阈值是实测出来的（1440 宽）：面板顶部固定，面板高 ≈ 443 + (条数 − 4) × 76，
+   再留页面底部空隙，所以「H ≥ 732 + 76 × (条数 − 4) + 余量」才有这一档。
+   决定高度的是辅栏插件条目（约 76px/条）。 */
+@media (min-width: 901px) and (max-height: 1047px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 8),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 975px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 7),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 902px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 6),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 829px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 5),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 756px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 4),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/* 窄桌面（≤1140）：英雄区的分类 chip 会折成两行，整页比宽屏高约 30px，
+   所以同一档要再少一条，才不会在 1024×768 这种老屏幕上冒出滚动条。 */
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1085px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 8),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1010px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 7),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 937px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 6),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 862px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 5),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 740px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 4),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/* 精选块（首页顶部的「第 N 期」入口）会再占约 130px ≈ 两条的高度；
+   现在还没有发布过期号，所以平时不触发。一旦有期号，各档再少两条兜底。 */
+@media (min-width: 901px) {
+  .home-page:has(> .panel) .home-feed section .item-list > .item:nth-child(n + 7),
+  .home-page:has(> .panel) .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
+    display: none;
+  }
+}
+
+/* 矮窗口（≤830）：英雄区收一档，把省下的 ~45px 还给列表 ——
+   1024×768 这类老屏幕本来只够放 3 条，收一档之后能放 4 条。 */
+@media (min-width: 901px) and (max-height: 830px) {
+  .site-main:has(.home-page) {
+    padding-top: calc(var(--header-height) + 18px);
+  }
+  .home-page .home-title {
+    margin-bottom: 18px;
+    font-size: 46px;
+    line-height: 1.05;
+  }
+  .home-page .home-search {
+    margin-bottom: 16px;
+  }
+  .home-page .home-hero {
+    padding-bottom: 10px;
   }
 }
 

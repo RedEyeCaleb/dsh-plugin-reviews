@@ -145,7 +145,6 @@ export function ReviewsTabSwitchLink({
         title="点这里或标题都能切换"
         onClick={onClick}
       >
-        <SwitchGlyph />
         {direction === 'fwd' ? `切到「${target}」` : `切回「${target}」`}
       </Link>
     );
@@ -164,28 +163,6 @@ export function ReviewsTabSwitchLink({
         {direction === 'fwd' ? '→' : '←'}
       </span>
     </Link>
-  );
-}
-
-/** 说明胶囊的小图标：两个反向箭头，一眼看出"这里能换页签"。 */
-function SwitchGlyph() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 9h12" />
-      <path d="M13 6l3 3-3 3" />
-      <path d="M20 15H8" />
-      <path d="M11 12l-3 3 3 3" />
-    </svg>
   );
 }
 

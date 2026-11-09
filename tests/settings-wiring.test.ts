@@ -33,8 +33,8 @@ describe('可调参数', () => {
       'media.max_image_bytes': 10 * 1024 * 1024,
       'media.max_images_per_review': 20,
       'imports.max_markdown_bytes': 512 * 1024,
-      'home.latest_review_count': 6,
-      'home.recent_plugin_count': 12,
+      'home.latest_review_count': 8,
+      'home.recent_plugin_count': 8,
       'catalog.install_check_validity_seconds': 86400,
     };
     for (const [key, expected] of Object.entries(defaults)) {
@@ -49,7 +49,7 @@ describe('可调参数', () => {
     ctx = createTestDb();
     const db = ctx.db;
     const admin = insertUser(db, { role: 'admin' });
-    expect(numberSetting(db, 'home.latest_review_count', 6)).toBe(6);
+    expect(numberSetting(db, 'home.latest_review_count', 8)).toBe(8);
 
     const service = createSettingsService({ db });
     await service.update(caller(db, admin), {
@@ -57,7 +57,7 @@ describe('可调参数', () => {
       reason: '首页少放几条',
       requestKey: 'cfg-home-1',
     });
-    expect(numberSetting(db, 'home.latest_review_count', 6)).toBe(3);
+    expect(numberSetting(db, 'home.latest_review_count', 8)).toBe(3);
   });
 
   it('numberSetting：越界值回落默认值，坏值不会变成 NaN', async () => {
@@ -87,6 +87,6 @@ describe('可调参数', () => {
 
     // 非数字：回落到定义里的默认值，而不是 NaN
     force('home.recent_plugin_count', 'twelve');
-    expect(numberSetting(db, 'home.recent_plugin_count', 12)).toBe(12);
+    expect(numberSetting(db, 'home.recent_plugin_count', 8)).toBe(8);
   });
 });
