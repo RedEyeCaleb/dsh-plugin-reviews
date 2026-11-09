@@ -15,11 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # 只用 npm：仓库里是 package-lock.json，dev.cmd 与 Dockerfile 也都用 npm。
+      # 只用 npm：仓库里是 package-lock.json，dev.cmd 也走 npm。
       # 混用 pnpm 会生成第二套锁文件，装出可能不同的依赖树。
+      # Node 版本只认根目录的 `.nvmrc`：本地（nvm/fnm）与 CI 用同一行，
+      # 补丁版本自动跟最新（安全更新），大版本升级只改那一个文件。
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version-file: '.nvmrc'
           cache: npm
 
       - run: npm ci

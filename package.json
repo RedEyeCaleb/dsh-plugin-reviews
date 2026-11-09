@@ -5,7 +5,7 @@
   "type": "module",
   "description": "DSH Plugin Review · 最小功能切片（登录 → 收录插件 → 写/审/发一篇评测 → 评论）",
   "engines": {
-    "node": ">=22"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "next dev -p 3100",

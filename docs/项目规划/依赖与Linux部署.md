@@ -6,11 +6,11 @@
 
 ## 1. 首版运行组合
 
-建议以 Ubuntu 24.04 LTS、Linux x86_64 作为首版主机基线；应用容器采用 Debian bookworm 的 Node 24 LTS。主机安装 Docker Engine 与 Compose 插件，网站、任务和数据库不依赖主机全局 Node。Node 官方当前将 24 列为 LTS，生产环境优先使用受支持的 LTS 分支。[Node 发布状态](https://nodejs.org/en/about/previous-releases)
+建议以 Ubuntu 24.04 LTS、Linux x86_64 作为首版主机基线；应用容器采用 Debian bookworm 的 Node 26 LTS。主机安装 Docker Engine 与 Compose 插件，网站、任务和数据库不依赖主机全局 Node。Node 官方当前把 26（Lithium）列为 Active LTS、24（Krypton）为维护期 LTS，生产环境优先使用受支持的 LTS 分支。[Node 发布状态](https://nodejs.org/en/about/previous-releases)
 
 | 用途 | 核对后的候选版本 | 接入方式 |
 |---|---|---|
-| Node / 包管理 | Node 24.21.0；pnpm 12.11.2 | 容器构建与运行使用同一 Node 补丁版本。 |
+| Node / 包管理 | Node 26 LTS（26.13.0 起，`engines ≥24`）；pnpm 12.11.2 | 版本只写在仓库根目录的 `.nvmrc`，本地与 CI 共用；容器构建与运行使用同一 Node 补丁版本。 |
 | Web | Next.js 16.4.0；React / React DOM 19.3.0 | App Router；访问 SQLite 的路由明确使用 Node runtime。 |
 | TypeScript | 7.0.2 | Web 与 worker 共享契约和业务模块；完整构建兼容性实施时验证。 |
 | SQLite 访问 / 迁移 | better-sqlite3 13.0.3；Drizzle ORM 0.45.4 / Kit 0.31.11 | 统一 Repository 与事务接口；迁移由维护进程执行。 |
@@ -25,7 +25,9 @@
 
 上述 Node 范围符合已核对包的声明要求，不等于完整组合已通过生产验证。实施时补齐类型包和测试工具的 peer 依赖，固定直接依赖并提交 pnpm 完整锁文件；使用冻结锁文件安装。安全升级通过变更、复验和新镜像发布，不永久停留在本次候选版本。
 
-应用镜像候选为 `node:24.21.0-bookworm-slim`，代理为 `caddy:2.11.7-alpine`；已查询其多平台与 amd64 摘要，最终发布按验证后的 digest 固定。应用选择 glibc 环境以统一原生驱动和图片库的运行条件，Windows 的 node_modules 不复制到 Linux。[sharp 安装要求](https://sharp.pixelplumbing.com/install/)
+应用镜像候选为 `node:26-bookworm-slim`（按 `26.13.x` 打补丁），代理为 `caddy:2.11.7-alpine`；已查询其多平台与 amd64 摘要，最终发布按验证后的 digest 固定。应用选择 glibc 环境以统一原生驱动和图片库的运行条件，Windows 的 node_modules 不复制到 Linux。[sharp 安装要求](https://sharp.pixelplumbing.com/install/)
+
+Node 26 本地实测（2026-11-10，Windows x64，Node v26.13.0）：`better-sqlite3` 13.0.3 走的是 N-API 预编译包（`prebuilds/win32-x64.node`），**跨大版本不需要重编**，建库读写正常；`tsc --noEmit` 为 0，抽样测试通过。大版本升级前仍需跑一遍完整 `npm test`（CI 已切到 `.nvmrc` 里的版本）。
 
 ## 2. 进程与构建边界
 
@@ -111,6 +113,6 @@ SIGTERM 时停止新请求／任务领取并取消可取消工作，预留有界
 
 本轮已实际验证 8 项：连接与约束能力、Drizzle 查询与回滚、中文 FTS 与双字补充、快照备份完整性、图片转换、OAuth state / PKCE 基础验证、Zod 输入检查、安全 Markdown 渲染。运行环境为 Windows x64、Node 24.12.0，驱动内 SQLite 3.53.4，sharp 0.35.5 / libvips 8.18.7；全部位于隔离临时目录，不涉及网站业务数据。
 
-尚待实施验收：目标 Node 24.21.0 的 Linux 镜像完整构建、Web 与 worker 并发真实迁移、正式 GitHub OAuth、浏览器与代理上传、真实审核／S3 适配、停止重启和升级回退、完整恢复演练。当前环境没有 Docker，以上项目不记作已通过；性能容量也须实测。
+尚待实施验收：目标 Node 26（26.13.x）的 Linux 镜像完整构建、Web 与 worker 并发真实迁移、正式 GitHub OAuth、浏览器与代理上传、真实审核／S3 适配、停止重启和升级回退、完整恢复演练。当前环境没有 Docker，以上项目不记作已通过；性能容量也须实测。
 
 本类已确认，最后一类见 [实施顺序与验收](实施顺序与验收.md) 及架构第 110 节，仍待确认；将既定流程分阶段安排，不新增 P0 功能。
