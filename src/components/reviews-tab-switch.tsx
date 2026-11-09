@@ -159,9 +159,6 @@ export function ReviewsTabSwitchLink({
       onClick={onClick}
     >
       {label}
-      <span className="reviews-switch-arrow" aria-hidden="true">
-        {direction === 'fwd' ? '→' : '←'}
-      </span>
     </Link>
   );
 }

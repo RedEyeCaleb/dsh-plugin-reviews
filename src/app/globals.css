@@ -798,7 +798,7 @@ p {
 .reviews-switch-head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 8px 12px;
   margin: 0 0 16px;
@@ -817,22 +817,6 @@ p {
 .reviews-switch-link:hover {
   color: var(--accent);
   text-decoration: none;
-}
-.reviews-switch-arrow {
-  color: var(--muted);
-  font-weight: 400;
-  transition: transform var(--md-sys-motion-duration-short4)
-    var(--md-sys-motion-easing-emphasized);
-}
-.reviews-switch-link:hover .reviews-switch-arrow {
-  color: var(--accent);
-}
-/* 箭头顺着切换方向轻推一下：→ 往右、← 往左 */
-.reviews-switch-link[data-dir='fwd']:hover .reviews-switch-arrow {
-  transform: translateX(3px);
-}
-.reviews-switch-link[data-dir='back']:hover .reviews-switch-arrow {
-  transform: translateX(-3px);
 }
 
 /* 说明胶囊：告诉读者这里还有另一个页签（M3 assist chip 形态）。
@@ -2813,6 +2797,111 @@ input[type='search']:focus {
   }
   .home-page .home-hero {
     padding-bottom: 22px;
+  }
+}
+
+/* ------------------------------------------------------- 讨论区分区卡（M3 卡片）
+   分区之间是平级关系，用卡片网格比长列表更像"挑一个地方进去"：
+   首字徽标（primary-container 40dp / 圆角 12）+ 名称（官方、归档标签跟在名字后）
+   + 描述 + 元信息 + 右侧 chevron，整卡可点。
+   hover / pressed 走 M3 状态层（容器色加深一档），不引入新颜色。 */
+.forum-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.forum-board-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  height: 100%;
+  padding: 16px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-high);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard),
+    transform var(--md-sys-motion-duration-short4) var(--md-sys-motion-easing-standard);
+}
+.forum-board-card:hover {
+  background: var(--md-sys-color-surface-container-highest);
+  text-decoration: none;
+}
+.forum-board-card:active {
+  transform: scale(0.99);
+}
+.forum-board-avatar {
+  display: grid;
+  flex: 0 0 40px;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+}
+/* 官方分区换个容器色，和普通分区分开（不靠"官方"两个字也已经能认出） */
+.forum-board-avatar.official {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.forum-board-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.forum-board-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface);
+  font-size: var(--md-sys-typescale-title-medium-size);
+  font-weight: 600;
+  line-height: 22px;
+}
+.forum-board-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  line-height: 20px;
+}
+.forum-board-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+.forum-board-chevron {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  align-self: center;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .forum-board-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .forum-board-card {
+    padding: 14px;
   }
 }
 
