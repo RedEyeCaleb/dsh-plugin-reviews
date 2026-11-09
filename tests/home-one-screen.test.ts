@@ -15,11 +15,11 @@ const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
 describe('桌面首页一屏', () => {
   it('五档分档都在：屏高降到阈值以下就少一条', () => {
     for (const [height, keep] of [
-      ['1047', 8],
-      ['975', 7],
-      ['902', 6],
-      ['829', 5],
-      ['756', 4],
+      ['1073', 8],
+      ['997', 7],
+      ['921', 6],
+      ['845', 5],
+      ['719', 4],
     ] as const) {
       const block = new RegExp(
         `max-height: ${height}px\\)\\s*\\{[^}]*:nth-child\\(n \\+ ${keep}\\)`,
@@ -30,13 +30,18 @@ describe('桌面首页一屏', () => {
   });
 
   it('窄屏（≤1140）单独一套阈值：分类 chip 折行会多占约 30px', () => {
-    expect(css).toMatch(/max-width: 1140px\) and \(max-height: 1085px\)/);
-    expect(css).toMatch(/max-width: 1140px\) and \(max-height: 1010px\)/);
+    expect(css).toMatch(/max-width: 1140px\) and \(max-height: 1102px\)/);
+    expect(css).toMatch(/max-width: 1140px\) and \(max-height: 1026px\)/);
   });
 
-  it('矮窗口（≤830）收紧英雄区，把高度还给列表', () => {
-    expect(css).toMatch(/max-height: 830px\)[\s\S]{0,400}?\.home-title/);
-    expect(css).toMatch(/max-height: 830px\)[\s\S]{0,400}?font-size: 46px/);
+  it('矮窗口（≤840）收紧英雄区，但分类 chip 到面板仍留 22px', () => {
+    expect(css).toMatch(/max-height: 840px\)[\s\S]{0,400}?\.home-title/);
+    expect(css).toMatch(/max-height: 840px\)[\s\S]{0,400}?font-size: 46px/);
+    expect(css).toMatch(/max-height: 840px\)[\s\S]{0,600}?padding-bottom: 22px/);
+  });
+
+  it('分类 chip 与下面两栏之间留 26px（主人反馈原来贴太近）', () => {
+    expect(css).toMatch(/\.home-page \.home-hero \{[^}]*padding-bottom: 26px/);
   });
 
   it('面板纵向 flex + 按钮贴底：两栏等高时不出现半截按钮', () => {

@@ -2683,7 +2683,9 @@ input[type='search']:focus {
   }
   .home-page .home-hero {
     padding-top: 0;
-    padding-bottom: 12px;
+    /* 分类 chip 与下面两栏之间要留口气：12px 贴着面板，看着像挤在一起（主人反馈），
+       取 26px —— 比面板内边距(20)略大，读起来是"两段"而不是"一段"。 */
+    padding-bottom: 26px;
   }
   .home-page .home-feed > .panel {
     padding: 20px;
@@ -2721,31 +2723,31 @@ input[type='search']:focus {
    阈值是实测出来的（1440 宽）：面板顶部固定，面板高 ≈ 443 + (条数 − 4) × 76，
    再留页面底部空隙，所以「H ≥ 732 + 76 × (条数 − 4) + 余量」才有这一档。
    决定高度的是辅栏插件条目（约 76px/条）。 */
-@media (min-width: 901px) and (max-height: 1047px) {
+@media (min-width: 901px) and (max-height: 1073px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 8),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 975px) {
+@media (min-width: 901px) and (max-height: 997px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 7),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 902px) {
+@media (min-width: 901px) and (max-height: 921px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 6),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 829px) {
+@media (min-width: 901px) and (max-height: 845px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 5),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 756px) {
+@media (min-width: 901px) and (max-height: 719px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 4),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
     display: none;
@@ -2754,31 +2756,31 @@ input[type='search']:focus {
 
 /* 窄桌面（≤1140）：英雄区的分类 chip 会折成两行，整页比宽屏高约 30px，
    所以同一档要再少一条，才不会在 1024×768 这种老屏幕上冒出滚动条。 */
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1085px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1102px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 8),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1010px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1026px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 7),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 937px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 950px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 6),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 862px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 873px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 5),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 740px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 756px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 4),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
     display: none;
@@ -2794,9 +2796,10 @@ input[type='search']:focus {
   }
 }
 
-/* 矮窗口（≤830）：英雄区收一档，把省下的 ~45px 还给列表 ——
-   1024×768 这类老屏幕本来只够放 3 条，收一档之后能放 4 条。 */
-@media (min-width: 901px) and (max-height: 830px) {
+/* 矮窗口（≤840）：英雄区收一档，把省下的空间还给列表 ——
+   1024×768 这类老屏幕本来只够放 3 条，收一档之后能放 4 条。
+   注意下边距只收到 22px：再小就会像"标题贴着面板"，主人明确说过挤。 */
+@media (min-width: 901px) and (max-height: 840px) {
   .site-main:has(.home-page) {
     padding-top: calc(var(--header-height) + 18px);
   }
@@ -2809,7 +2812,7 @@ input[type='search']:focus {
     margin-bottom: 16px;
   }
   .home-page .home-hero {
-    padding-bottom: 10px;
+    padding-bottom: 22px;
   }
 }
 
