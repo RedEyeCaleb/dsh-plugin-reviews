@@ -205,9 +205,9 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description:
       '首页「最新评测」栏目的条数。桌面端要保证"一屏不滚动"，屏高不够时会少显示几条（见 globals.css 的分档）。',
     kind: 'integer',
-    defaultValue: 8,
+    defaultValue: 12,
     min: 1,
-    max: 20,
+    max: 24,
     unit: '条',
   },
   {
@@ -216,9 +216,9 @@ export const SETTING_DEFINITIONS: readonly SettingDefinition[] = [
     description:
       '首页「近期更新插件」栏目的条数。桌面端要保证"一屏不滚动"，屏高不够时会少显示几条（见 globals.css 的分档）。',
     kind: 'integer',
-    defaultValue: 8,
+    defaultValue: 12,
     min: 1,
-    max: 30,
+    max: 24,
     unit: '条',
   },
   {

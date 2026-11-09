@@ -4,7 +4,7 @@
  * 视觉：英雄区大字展示标题 + 搜索，直接落在深色底上（不套面板）；
  * 下面双栏面板（最新评测约 2/3 + 近期更新插件约 1/3）。
  *
- * 两个列表各取 8 条起（后台可用 home.latest_review_count / home.recent_plugin_count 调整），
+ * 两个列表各取 12 条起（后台可用 home.latest_review_count / home.recent_plugin_count 调整），
  * 面板底部给「查看全部」按钮跳转到对应列表页；不再做滚动懒加载（主人要求：一屏看完 + 明确出口）。
  * 桌面端"一屏"靠 CSS 分档实现：屏高不够时用 nth-child 少显示几条（见 globals.css）。
  */
@@ -72,11 +72,11 @@ function categoryHref(slug: string | null): string {
 
 export default async function HomePage() {
   const db = getDb();
-  const reviews = latestPublicReviews(numberSetting(db, 'home.latest_review_count', 8));
+  const reviews = latestPublicReviews(numberSetting(db, 'home.latest_review_count', 12));
   const catalog = createCatalogService({ db });
   const recentPlugins = await catalog.listPlugins({
     page: 1,
-    page_size: numberSetting(db, 'home.recent_plugin_count', 8),
+    page_size: numberSetting(db, 'home.recent_plugin_count', 12),
   });
   // 页面 chip 行用**分类**（中文、按不同仓库计数），不再直接暴露原始 topics
   const categories = await catalog.listCategories();

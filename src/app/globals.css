@@ -2756,8 +2756,10 @@ input[type='search']:focus {
           宁可少两条，也不要让整页出现一条滚不动的滚动条。
      两栏等高、按钮贴底：两个面板都改成 flex 纵向，"查看全部"用 margin-top:auto 顶到底。 */
   .site-main:has(.home-page) {
-    padding-top: calc(var(--header-height) + 28px);
-    padding-bottom: 20px;
+    /* 标题离顶栏远一点（主人 2026-11-10：「显得很挤，要像参考图那样有空隙」）：
+       之前为了塞进一屏收到 28px，现在把气口还回来，条数改由下面的分档控制。 */
+    padding-top: calc(var(--header-height) + 40px);
+    padding-bottom: 24px;
   }
   html:has(.home-page) {
     overscroll-behavior-y: none;
@@ -2765,24 +2767,39 @@ input[type='search']:focus {
   .home-page .home-hero {
     padding-top: 0;
     /* 分类 chip 与下面两栏之间要留口气：12px 贴着面板，看着像挤在一起（主人反馈），
-       取 26px —— 比面板内边距(20)略大，读起来是"两段"而不是"一段"。 */
-    padding-bottom: 26px;
+       取 30px —— 比面板内边距(20)大，读起来是"两段"而不是"一段"。 */
+    padding-bottom: 30px;
   }
-  .home-page .home-feed > .panel {
+  .home-page .home-title {
+    margin-bottom: 32px;
+  }
+  /* ⚠️ 两栏其实是 .home-feed > .twocol > .panel，写 > .panel 一条都匹配不到（踩过） */
+  .home-page .home-feed .twocol > .panel {
     padding: 20px;
   }
   .home-page .home-feed .section-head {
     margin-bottom: 12px;
   }
+  /* 行高 70px（内边距 8×2 + 内容 ~54）：首页铺满一屏要按这个数算条数。
+     行内两行的行高收到 20/3px，是在"不挤"和"多放一条"之间取的折中（实测 76 → 70）。 */
   .home-page .home-feed section .item-list > .item {
-    padding-top: 10px;
-    padding-bottom: 10px;
+    min-height: 70px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .home-page .home-feed .item-title {
+    margin-bottom: 3px;
+  }
+  .home-page .home-feed .list-meta {
+    margin-top: 3px;
+    line-height: 20px;
   }
 
   /* 两栏都按纵向 flex 排：列表占满剩余高度，按钮固定在面板底部 */
-  .home-page .home-feed > .panel {
+  .home-page .home-feed .twocol > .panel {
     display: flex;
     flex-direction: column;
+    min-height: 0;
   }
   .home-feed aside .home-plugin-list {
     display: flex;
@@ -2794,76 +2811,197 @@ input[type='search']:focus {
   .home-feed aside .home-plugin-list > .home-plugin-item {
     flex: 1 1 auto;
   }
+  /* 左栏同样均分：两栏条目高度一致，不会出现"左边挤在顶部、右边铺满"的错位 */
+  .home-page .home-feed section .item-list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+  .home-page .home-feed section .item-list > .item {
+    flex: 1 1 auto;
+  }
   .home-page .home-feed .home-more {
     margin-top: auto;
     padding-top: 12px;
   }
 }
 
-/* 首页一屏分档：屏高每降一档就少放一条。
-   阈值是实测出来的（1440 宽）：面板顶部固定，面板高 ≈ 443 + (条数 − 4) × 76，
-   再留页面底部空隙，所以「H ≥ 732 + 76 × (条数 − 4) + 余量」才有这一档。
-   决定高度的是辅栏插件条目（约 76px/条）。 */
-@media (min-width: 901px) and (max-height: 1073px) {
+/* 桌面首页整页铺满一屏：主区做成纵向 flex，两栏吃掉剩余高度 ——
+   这样页面底部正好落在视口底边，不会在面板下面留一条"没填满"的缝
+   （主人：「还是显得很挤 / 还能再放几条」）。条数本身仍由下面的分档决定。 */
+@media (min-width: 901px) {
+  .site-main:has(.home-page) {
+    display: flex;
+    flex-direction: column;
+    /* 必须给**确定**高度：只写 min-height 的话，主区仍会按内容撑高，
+       下面的 flex 子项就永远压不回视口内（实测面板 598 而不是 553）。 */
+    height: 100vh;
+    min-height: 100vh;
+  }
+  .site-main:has(.home-page) > .home-page {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* 中间还有 home-feed-wrap（手机端切换用的壳）与 home-feed：三层都要能"传"高度，
+     只给最外层 flex 是传不到面板上的（实测面板仍是内容高度）。 */
+  .home-page .home-feed-wrap,
+  .home-page .home-feed {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .home-page .home-feed .twocol {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+    /* 单行必须显式 1fr：默认的 auto 行会按内容撑高，容器再矮也压不下来（实测面板仍溢出 45px） */
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+/* 首页一屏分档（最多 12 条）：屏高每降一档就少放一条。
+   面板铺满视口（见上面那段 flex），每条约占 76px（两行文字 + 8×2 内边距，实测压不下去），
+   阈值算式：required(N) = 面板顶 + 156（面板头/按钮/内边距 + 页底留白）+ 76 × N。
+   1440 宽实测：面板顶 323；窄屏（chip 折行）351；矮窗口压缩档 266 / 296。
+   「3 条及以下」只由矮窗口那一组管，避免同一屏高被两套阈值来回覆盖（踩过）。
+   要改条数上限或行高，请整组重算，不要单独改某一个数。 */
+
+@media (min-width: 901px) and (max-height: 1390px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 12),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 12) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 1314px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 11),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 11) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 1238px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 10),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 10) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 1162px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 9),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 9) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-height: 1086px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 8),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 997px) {
+@media (min-width: 901px) and (max-height: 1010px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 7),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 921px) {
+@media (min-width: 901px) and (max-height: 934px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 6),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 845px) {
+@media (min-width: 901px) and (max-height: 858px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 5),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-height: 719px) {
+@media (min-width: 901px) and (max-height: 782px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 4),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
     display: none;
   }
 }
 
-/* 窄桌面（≤1140）：英雄区的分类 chip 会折成两行，整页比宽屏高约 30px，
-   所以同一档要再少一条，才不会在 1024×768 这种老屏幕上冒出滚动条。 */
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1102px) {
+/* 窄桌面（≤1140）：分类 chip 折两行，面板顶比宽屏低 28px，同一档要再少一条 */
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1418px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 12),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 12) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1342px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 11),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 11) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1266px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 10),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 10) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1190px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 9),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 9) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1114px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 8),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 8) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1026px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 1038px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 7),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 7) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 950px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 962px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 6),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 6) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 873px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 886px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 5),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 5) {
     display: none;
   }
 }
-@media (min-width: 901px) and (max-width: 1140px) and (max-height: 756px) {
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 810px) {
   .home-page .home-feed section .item-list > .item:nth-child(n + 4),
   .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+/* 矮窗口（≤840）英雄区压缩过、面板顶更高：同一屏高能多放一条，单独覆盖一遍 */
+@media (min-width: 1141px) and (max-height: 725px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 4),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
+    display: none;
+  }
+}
+@media (min-width: 1141px) and (max-height: 649px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 3),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 3) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 755px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 4),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 4) {
+    display: none;
+  }
+}
+@media (min-width: 901px) and (max-width: 1140px) and (max-height: 679px) {
+  .home-page .home-feed section .item-list > .item:nth-child(n + 3),
+  .home-page .home-feed aside .home-plugin-list > .home-plugin-item:nth-child(n + 3) {
     display: none;
   }
 }
@@ -2882,18 +3020,18 @@ input[type='search']:focus {
    注意下边距只收到 22px：再小就会像"标题贴着面板"，主人明确说过挤。 */
 @media (min-width: 901px) and (max-height: 840px) {
   .site-main:has(.home-page) {
-    padding-top: calc(var(--header-height) + 18px);
+    padding-top: calc(var(--header-height) + 24px);
   }
   .home-page .home-title {
-    margin-bottom: 18px;
+    margin-bottom: 22px;
     font-size: 46px;
     line-height: 1.05;
   }
   .home-page .home-search {
-    margin-bottom: 16px;
+    margin-bottom: 18px;
   }
   .home-page .home-hero {
-    padding-bottom: 22px;
+    padding-bottom: 24px;
   }
 }
 
